@@ -12,11 +12,6 @@ public class OrderDetails {
 	@Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long orderId;
-   // @ManyToOne
-    //private User userId;
-    //@ManyToOne
-    //private Book bookId;
-    private Date orderDate; 
-//    private OrderDetails orderDetails;
+    private Date orderDate;
     private Double totalAmount;
 }
