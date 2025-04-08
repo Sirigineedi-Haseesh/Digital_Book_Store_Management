@@ -1,13 +1,11 @@
-package com.cognizant.bookstore.model;
-import java.util.HashSet;
-import java.util.Set;
+package com.cognizant.bookstore.dto;
+import com.cognizant.bookstore.model.Inventory;
 
 import jakarta.persistence.*;
 import lombok.Data;
 
-@Entity
 @Data
-public class Book {
+public class BookDTO {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long bookId;
@@ -17,8 +15,6 @@ public class Book {
     private long price;
     private String authorName;
     private String images;
-    @ManyToMany(mappedBy = "books")
-    private Set<User> users = new HashSet<>();
-    @OneToOne(mappedBy="book" ,cascade = CascadeType.ALL)
     private Inventory inventory;
 }
+
