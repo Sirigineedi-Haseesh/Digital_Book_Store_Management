@@ -1,12 +1,23 @@
 package com.cognizant.bookstore.model;
-import java.util.HashSet;
-import java.util.Set;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 @Entity
-@Data
+//@Data
+@Getter
+@Setter
+@ToString
 public class Book {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -17,8 +28,7 @@ public class Book {
     private long price;
     private String authorName;
     private String images;
-    @ManyToMany(mappedBy = "books")
-    private Set<User> users = new HashSet<>();
     @OneToOne(mappedBy="book" ,cascade = CascadeType.ALL)
+    @JsonIgnore
     private Inventory inventory;
 }

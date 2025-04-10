@@ -13,6 +13,8 @@ import com.cognizant.bookstore.model.Inventory;
 import com.cognizant.bookstore.repository.BookRepository;
 import com.cognizant.bookstore.repository.InventoryRepository;
 
+import jakarta.transaction.Transactional;
+
 
 @Service
 public class BookService {
@@ -44,7 +46,6 @@ public class BookService {
                 .collect(Collectors.toList());
 	}
 
-	
 	public BookDTO updateBooks(String title, BookDTO bookDTO) {
 	    Book books = bookRepository.findByBookName(title);
 	    if (books == null) {
@@ -55,7 +56,7 @@ public class BookService {
 	    books.setBookId(originalId);
 	    Book updatedBook = bookRepository.save(books);
 	    
-	    Inventory inventory = inventoryRepository.findByBookId(books.getBookId());
+	    Inventory inventory = inventoryRepository.findByBookBookId(books.getBookId());
 	    inventory.setStock(books.getInventory().getStock());
 	    inventory.setBook(books);
 	    inventoryRepository.save(inventory);
@@ -63,6 +64,7 @@ public class BookService {
 	    return modelMapper.map(updatedBook, BookDTO.class);
 	    
 	}
+ 
 	
 	public BookDTO updateBooksPatch(String title, BookDTO bookDTO) {
 	    Book book = bookRepository.findByBookName(title);
@@ -79,14 +81,13 @@ public class BookService {
 
 	    // Ensure inventory exists before updating stock
 	    Inventory inventory = book.getInventory();
-
 	    if (inventory == null) {
 	        inventory = new Inventory();  // Create a new inventory if it doesn't exist
 	        inventory.setBook(book);      // Link the inventory to the book
 	    }
 
 	    if (bookDTO.getInventory() != null) {
-	        inventory.setStock(bookDTO.getInventory().getStock());
+	        inventory.setStock(inventory.getStock()+bookDTO.getInventory().getStock());
 	    }
 
 	    inventoryRepository.save(inventory);
