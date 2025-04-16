@@ -12,16 +12,15 @@ import lombok.ToString;
 //@Data
 @Getter
 @Setter
-@ToString
+//@ToString
 public class Inventory {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private long inventoryId;
 	@OneToOne
 	@JoinColumn(name = "bookId")
-	
 	@JsonIgnore
-	@ToString.Exclude //Added new
+//	@ToString.Exclude //Added new
 	private Book book;
 	private int stock;
 }

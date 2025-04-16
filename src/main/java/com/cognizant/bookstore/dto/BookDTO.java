@@ -2,11 +2,14 @@ package com.cognizant.bookstore.dto;
 import com.cognizant.bookstore.model.Inventory;
 
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Positive;
 
-@Data
+@Getter
+@Setter
 public class BookDTO {
     private long bookId;
 

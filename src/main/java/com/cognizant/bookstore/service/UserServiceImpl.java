@@ -55,10 +55,11 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
 
-        modelMapper.map(dto, user); // Update the entity using ModelMapper
+        modelMapper.map(dto, user); // Ensure correct mapping to update the entity
         User updated = userRepository.save(user);
-        return modelMapper.map(updated, UserProfileDTO.class);
+        return modelMapper.map(updated, UserProfileDTO.class); // Convert updated entity back to DTO
     }
+
 
 	@Override
 	public List<UserProfileDTO> getAllUser() {
