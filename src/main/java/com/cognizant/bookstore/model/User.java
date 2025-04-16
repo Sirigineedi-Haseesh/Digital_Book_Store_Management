@@ -1,4 +1,5 @@
 package com.cognizant.bookstore.model;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -7,9 +8,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import lombok.Data;
 
@@ -25,6 +23,6 @@ public class User {
 	private String email;
 	private String fullName;
 	private String Address;
-	@OneToMany(mappedBy = "user", cascade = CascadeType.ALL)  // newly added 
+	@OneToMany(mappedBy = "user", cascade = CascadeType.ALL) // newly added
 	private Set<OrderDetails> orders = new HashSet<>();
 }

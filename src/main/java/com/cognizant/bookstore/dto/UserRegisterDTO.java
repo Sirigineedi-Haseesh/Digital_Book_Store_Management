@@ -11,7 +11,8 @@ public class UserRegisterDTO {
     @Size(min = 3, max = 20, message = "Username must be between 3 and 20 characters")
     private String userName;
 
-    @NotBlank(message = "Password cannot be empty")
+    @NotBlank(message = "Pas"
+    		+ "sword cannot be empty")
     @Size(min = 6, message = "Password must be at least 6 characters long")
     private String password;
 
@@ -24,4 +25,15 @@ public class UserRegisterDTO {
 
     @NotBlank(message = "Address cannot be empty")
     private String address;
+    
+//    private String role;
 }
+
+
+//
+//
+//dev - developer 
+//
+//UAT - user acceptance testing
+//SIT - use environment to test the application
+//perf region(single application runs in multiple server)--profile in springBoot / performance testing) - used for testing the time taking to perform the operation
