@@ -1,5 +1,13 @@
 package com.cognizant.bookstore.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.cognizant.bookstore.dto.ReviewAndRatingDTO;
 import com.cognizant.bookstore.model.Book;
 import com.cognizant.bookstore.model.ReviewAndRating;
@@ -8,94 +16,98 @@ import com.cognizant.bookstore.repository.BookRepository;
 import com.cognizant.bookstore.repository.ReviewAndRatingRepository;
 import com.cognizant.bookstore.repository.UserRepository;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.stream.Collectors;
-
 @Service
 public class ReviewAndRatingService {
 
-	private final ReviewAndRatingRepository reviewAndRatingRepository;
-	private final BookRepository bookRepository;
-	private final UserRepository userRepository;
+    @Autowired
+    private ReviewAndRatingRepository reviewAndRatingRepository;
 
-	@Autowired
-	public ReviewAndRatingService(ReviewAndRatingRepository reviewAndRatingRepository, BookRepository bookRepository,
-			UserRepository userRepository) {
-		this.reviewAndRatingRepository = reviewAndRatingRepository;
-		this.bookRepository = bookRepository;
-		this.userRepository = userRepository;
-	}
+    @Autowired
+    private BookRepository bookRepository;
 
-	// Add a new review and rating
-	public ReviewAndRatingDTO addReviewAndRating(ReviewAndRatingDTO dto) {
-		ReviewAndRating reviewAndRating = convertDTOToEntity(dto);
-		ReviewAndRating savedEntity = reviewAndRatingRepository.save(reviewAndRating);
-		return convertEntityToDTO(savedEntity);
-	}
+    @Autowired
+    private UserRepository userRepository;
 
-	// Get all reviews and ratings
-	public List<ReviewAndRatingDTO> getAllReviewsAndRatings() {
-		return reviewAndRatingRepository.findAll().stream().map(this::convertEntityToDTO).collect(Collectors.toList());
-	}
+    @Autowired
+    private ModelMapper modelMapper;
 
-	// Get a single review and rating by ID
-	public ReviewAndRatingDTO getReviewAndRatingById(int id) {
-		ReviewAndRating reviewAndRating = reviewAndRatingRepository.findById(id)
-				.orElseThrow(() -> new IllegalArgumentException("Review with ID " + id + " not found"));
-		return convertEntityToDTO(reviewAndRating);
-	}
+    // Add a new review and rating
+    public ReviewAndRatingDTO addReviewAndRating(ReviewAndRatingDTO dto) {
+        ReviewAndRating reviewAndRating = modelMapper.map(dto, ReviewAndRating.class);
 
-	// Update an existing review and rating
-	public ReviewAndRatingDTO updateReviewAndRating(ReviewAndRatingDTO dto) {
-		if (!reviewAndRatingRepository.existsById(dto.getReviewId())) {
-			throw new IllegalArgumentException("Review with ID " + dto.getReviewId() + " not found");
-		}
-		ReviewAndRating reviewAndRating = convertDTOToEntity(dto);
-		ReviewAndRating updatedEntity = reviewAndRatingRepository.save(reviewAndRating);
-		return convertEntityToDTO(updatedEntity);
-	}
+        // Set current time for the `date` field
+        reviewAndRating.setDate(LocalDateTime.now());
 
-	// Delete a review and rating by ID
-	public void deleteReviewAndRating(int id) {
-		if (!reviewAndRatingRepository.existsById(id)) {
-			throw new IllegalArgumentException("Review with ID " + id + " not found");
-		}
-		reviewAndRatingRepository.deleteById(id);
-	}
+        // Fetch Book and User from the database before saving
+        reviewAndRating.setBook(bookRepository.findById(dto.getBookId())
+                .orElseThrow(() -> new IllegalArgumentException("Book with ID " + dto.getBookId() + " not found")));
+        reviewAndRating.setUser(userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("User with ID " + dto.getUserId() + " not found")));
 
-	// Convert Entity to DTO
-	private ReviewAndRatingDTO convertEntityToDTO(ReviewAndRating reviewAndRating) {
-		ReviewAndRatingDTO dto = new ReviewAndRatingDTO();
-		dto.setReviewId(reviewAndRating.getReviewId());
-		dto.setRating(reviewAndRating.getRating());
-		dto.setReview(reviewAndRating.getReview());
-		dto.setDate(reviewAndRating.getDate());
-		dto.setBookTitle(reviewAndRating.getBook().getTitle());
-		dto.setUserName(reviewAndRating.getUser().getUserName());
-		return dto;
-	}
+        ReviewAndRating savedEntity = reviewAndRatingRepository.save(reviewAndRating);
+        return modelMapper.map(savedEntity, ReviewAndRatingDTO.class);
+    }
 
-	// Convert DTO to Entity
-	private ReviewAndRating convertDTOToEntity(ReviewAndRatingDTO dto) {
-		ReviewAndRating reviewAndRating = new ReviewAndRating();
-		reviewAndRating.setReviewId(dto.getReviewId());
-		reviewAndRating.setRating(dto.getRating());
-		reviewAndRating.setReview(dto.getReview());
-		reviewAndRating.setDate(dto.getDate());
+    // Get all reviews and ratings
+    public List<ReviewAndRatingDTO> getAllReviewsAndRatings() {
+        return reviewAndRatingRepository.findAll()
+                .stream()
+                .map(review -> modelMapper.map(review, ReviewAndRatingDTO.class))
+                .collect(Collectors.toList());
+    }
 
-		// Fetch Book entity from the database using bookTitle
-		Book book = bookRepository.findByTitle(dto.getBookTitle()).orElseThrow(
-				() -> new IllegalArgumentException("Book with title \"" + dto.getBookTitle() + "\" not found"));
-		reviewAndRating.setBook(book);
+    // Get a single review and rating by ID
+    public ReviewAndRatingDTO getReviewAndRatingById(int id) {
+        ReviewAndRating reviewAndRating = reviewAndRatingRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Review with ID " + id + " not found"));
+        return modelMapper.map(reviewAndRating, ReviewAndRatingDTO.class);
+    }
 
-		// Fetch User entity from the database using userName
-		User user = userRepository.findByUserName(dto.getUserName()).orElseThrow(
-				() -> new IllegalArgumentException("User with username \"" + dto.getUserName() + "\" not found"));
-		reviewAndRating.setUser(user);
+    // Update an existing review and rating
+    public ReviewAndRatingDTO updateReviewAndRating(ReviewAndRatingDTO dto) {
+        if (!reviewAndRatingRepository.existsById(dto.getReviewId())) {
+            throw new IllegalArgumentException("Review with ID " + dto.getReviewId() + " not found");
+        }
+        ReviewAndRating reviewAndRating = modelMapper.map(dto, ReviewAndRating.class);
+        reviewAndRating.setBook(bookRepository.findById(dto.getBookId())
+                .orElseThrow(() -> new IllegalArgumentException("Book with ID " + dto.getBookId() + " not found")));
+        reviewAndRating.setUser(userRepository.findById(dto.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("User with ID " + dto.getUserId() + " not found")));
 
-		return reviewAndRating;
-	}
+        // Preserve existing date or set a new one if necessary
+        if (dto.getDate() == null) {
+            reviewAndRating.setDate(LocalDateTime.now());
+        }
+
+        ReviewAndRating updatedEntity = reviewAndRatingRepository.save(reviewAndRating);
+        return modelMapper.map(updatedEntity, ReviewAndRatingDTO.class);
+    }
+
+    // Delete a review and rating by ID
+    public void deleteReviewAndRating(int id) {
+        if (!reviewAndRatingRepository.existsById(id)) {
+            throw new IllegalArgumentException("Review with ID " + id + " not found");
+        }
+        reviewAndRatingRepository.deleteById(id);
+    }
+
+    // Partially update a review
+    public ReviewAndRatingDTO updateReviewAndRatingFields(int id, ReviewAndRatingDTO dto) {
+        ReviewAndRating existingReview = reviewAndRatingRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Review with ID " + id + " not found"));
+
+        // Apply partial updates only if fields are non-null
+        if (dto.getRating() != 0) {
+            existingReview.setRating(dto.getRating());
+        }
+        if (dto.getReview() != null) {
+            existingReview.setReview(dto.getReview());
+        }
+        if (dto.getDate() == null) {
+            existingReview.setDate(LocalDateTime.now());
+        }
+
+        ReviewAndRating updatedReview = reviewAndRatingRepository.save(existingReview);
+        return modelMapper.map(updatedReview, ReviewAndRatingDTO.class);
+    }
 }

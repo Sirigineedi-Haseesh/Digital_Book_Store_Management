@@ -2,9 +2,10 @@ package com.cognizant.bookstore.service;
 
 import com.cognizant.bookstore.dto.OrderBookAssociationDTO;
 import com.cognizant.bookstore.dto.OrderDetailsDTO;
-import com.cognizant.bookstore.exceptions.ResourceNotFoundException;
-
-
+import com.cognizant.bookstore.exceptions.BookNotFoundException;
+import com.cognizant.bookstore.exceptions.InvalidOrderException;
+import com.cognizant.bookstore.exceptions.OrderNotFoundException;
+import com.cognizant.bookstore.exceptions.UserNotFoundException;
 import com.cognizant.bookstore.model.Book;
 import com.cognizant.bookstore.model.OrderBookAssociation;
 import com.cognizant.bookstore.model.OrderDetails;
@@ -55,6 +56,18 @@ public class OrderDetailsService {
     }
 
     /**
+     * Retrieve order details by order ID.
+     *
+     * @param orderId order ID
+     * @return order details in DTO format
+     */
+    public OrderDetailsDTO getOrderDetailsByOrderId(Long orderId) {
+        OrderDetails orderDetails = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found for ID: " + orderId));
+        return modelMapper.map(orderDetails, OrderDetailsDTO.class);
+    }
+
+    /**
      * Create a new order.
      *
      * @param orderDetailsDTO order details in DTO format
@@ -62,13 +75,11 @@ public class OrderDetailsService {
      */
     @Transactional
     public OrderDetailsDTO createOrder(OrderDetailsDTO orderDetailsDTO) {
-        // Validate user
         User user = userRepository.findById(orderDetailsDTO.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found for ID: " + orderDetailsDTO.getUserId()));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        // Validate order books
         if (orderDetailsDTO.getOrderBooks() == null || orderDetailsDTO.getOrderBooks().isEmpty()) {
-            throw new RuntimeException("Order must contain at least one book");
+            throw new InvalidOrderException("Order must contain at least one book");
         }
 
         OrderDetails orderDetails = new OrderDetails();
@@ -79,19 +90,18 @@ public class OrderDetailsService {
         Set<OrderBookAssociation> orderBooks = new HashSet<>();
 
         for (OrderBookAssociationDTO orderBookDTO : orderDetailsDTO.getOrderBooks()) {
-            // Fetch and validate the book
+            // Fetch the book by ID
             Book book = bookRepository.findById(orderBookDTO.getBookId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Book not found for ID: " + orderBookDTO.getBookId()));
+                    .orElseThrow(() -> new BookNotFoundException("Book not found"));
 
-            // Validate quantity
-            if (orderBookDTO.getQuantity() <= 0) {
-                throw new RuntimeException("Invalid quantity provided for book ID: " + book.getBookId());
+            // Validate book ID and quantity
+            if (orderBookDTO == null || orderBookDTO.getQuantity() <= 0) {
+                throw new InvalidOrderException("Invalid quantity provided.");
             }
 
             // Call InventoryService to reduce stock
-            inventoryService.reduceStockOnOrder(book.getBookId(), orderBookDTO.getQuantity());
+            inventoryService.reduceStockOnOrder(book.getTitle(), orderBookDTO.getQuantity());
 
-            // Create the OrderBookAssociation
             OrderBookAssociation orderBook = new OrderBookAssociation();
             orderBook.setOrder(orderDetails);
             orderBook.setBook(book);
@@ -99,16 +109,14 @@ public class OrderDetailsService {
 
             orderBooks.add(orderBook);
 
-            // Calculate total amount
             totalAmount += book.getPrice() * orderBookDTO.getQuantity();
         }
 
-        // Set order details
         orderDetails.setTotalAmount(totalAmount);
         orderDetails.setOrderBooks(orderBooks);
 
-        // Save and return order details
         OrderDetails savedOrder = orderRepository.save(orderDetails);
+
         return modelMapper.map(savedOrder, OrderDetailsDTO.class);
     }
 }

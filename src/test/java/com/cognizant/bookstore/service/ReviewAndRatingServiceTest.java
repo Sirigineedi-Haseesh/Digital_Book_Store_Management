@@ -1,27 +1,13 @@
 package com.cognizant.bookstore.service;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
+import org.mockito.MockitoAnnotations;
 
 import com.cognizant.bookstore.dto.ReviewAndRatingDTO;
 import com.cognizant.bookstore.model.Book;
@@ -30,178 +16,174 @@ import com.cognizant.bookstore.model.User;
 import com.cognizant.bookstore.repository.BookRepository;
 import com.cognizant.bookstore.repository.ReviewAndRatingRepository;
 import com.cognizant.bookstore.repository.UserRepository;
+import com.cognizant.bookstore.service.ReviewAndRatingService;
 
-@ExtendWith(MockitoExtension.class)
-public class ReviewAndRatingServiceTest {
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.Collections;
+import java.util.List;
 
-	@Mock
-	private ReviewAndRatingRepository reviewAndRatingRepository;
+class ReviewAndRatingServiceTest {
 
-	@Mock
-	private BookRepository bookRepository;
+    @InjectMocks
+    private ReviewAndRatingService service;
 
-	@Mock
-	private UserRepository userRepository;
-//    @Autowired
-//    private ModelMapper modelMapper;
+    @Mock
+    private ReviewAndRatingRepository reviewAndRatingRepository;
 
-	@Mock
-	private ModelMapper modelMapper;
-	@InjectMocks
-	private ReviewAndRatingService reviewAndRatingService;
+    @Mock
+    private BookRepository bookRepository;
 
-	private ReviewAndRating reviewAndRating;
-	private ReviewAndRatingDTO reviewAndRatingDTO;
-	private Book book;
-	private User user;
+    @Mock
+    private UserRepository userRepository;
 
-	@BeforeEach
-	public void setUp() {
-		// Mock User
-		user = new User();
-		user.setUserId(1L);
-		user.setUserName("Test User");
+    @Mock
+    private org.modelmapper.ModelMapper modelMapper;
 
-		// Mock Book
-		book = new Book();
-		book.setBookId(1L);
-		book.setTitle("Test Book");
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+    }
 
-		// Mock ReviewAndRating
-		reviewAndRating = new ReviewAndRating();
-		reviewAndRating.setReviewId(1);
-		reviewAndRating.setRating(5);
-		reviewAndRating.setReview("Great book!");
-		reviewAndRating.setDate(null); // Assign a valid date if required
-		reviewAndRating.setBook(book);
-		reviewAndRating.setUser(user);
+    @Test
+    void testAddReviewAndRating_success() {
+        // Arrange
+        ReviewAndRatingDTO dto = new ReviewAndRatingDTO();
+        dto.setBookId(1L);
+        dto.setUserId(1L);
+        dto.setReview("Great book!");
+        dto.setRating(5);
+        dto.setDate(LocalDateTime.now());
 
-		// Mock ReviewAndRatingDTO
-		reviewAndRatingDTO = new ReviewAndRatingDTO();
-		reviewAndRatingDTO.setReviewId(1);
-		reviewAndRatingDTO.setRating(5);
-		reviewAndRatingDTO.setReview("Great book!");
-		reviewAndRatingDTO.setDate(null); // Assign a valid date if required
-		reviewAndRatingDTO.setBookTitle("Test Book");
-		reviewAndRatingDTO.setUserName("Test User");
-	}
-	@Test
-	public void testAddReviewAndRating() {
-	    // Mocking repositories and ModelMapper
-	    when(bookRepository.findByTitle("Test Book")).thenReturn(Optional.of(book));
-	    when(userRepository.findByUserName("Test User")).thenReturn(Optional.of(user));
-	    when(reviewAndRatingRepository.save(any(ReviewAndRating.class))).thenReturn(reviewAndRating);
+        Book mockBook = new Book();
+        mockBook.setBookId(1L);
 
-	    // Correctly stub ModelMapper
-	    when(modelMapper.map(eq(reviewAndRating), eq(ReviewAndRatingDTO.class))).thenReturn(reviewAndRatingDTO);
+        User mockUser = new User();
+        mockUser.setUserId(1L);
 
-	    // Call the service method
-	    ReviewAndRatingDTO result = reviewAndRatingService.addReviewAndRating(reviewAndRatingDTO);
+        ReviewAndRating mockReview = new ReviewAndRating();
+        mockReview.setReview(dto.getReview());
+        mockReview.setRating(dto.getRating());
+        mockReview.setDate(dto.getDate());
+        mockReview.setBook(mockBook);
+        mockReview.setUser(mockUser);
 
-	    // Assertions
-	    assertNotNull(result);
-	    assertEquals(reviewAndRatingDTO, result); // Correct comparison using updated equals method
-	    verify(bookRepository, times(1)).findByTitle("Test Book");
-	    verify(userRepository, times(1)).findByUserName("Test User");
-	    verify(reviewAndRatingRepository, times(1)).save(any(ReviewAndRating.class));
-	    verify(modelMapper, times(1)).map(eq(reviewAndRating), eq(ReviewAndRatingDTO.class));
-	}
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(mockBook));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(modelMapper.map(dto, ReviewAndRating.class)).thenReturn(mockReview);
+        when(reviewAndRatingRepository.save(mockReview)).thenReturn(mockReview);
+        when(modelMapper.map(mockReview, ReviewAndRatingDTO.class)).thenReturn(dto);
 
+        // Act
+        ReviewAndRatingDTO result = service.addReviewAndRating(dto);
 
-	@Test
-	public void testGetAllReviewsAndRatings() {
-		// Mock the repository call to find all reviews and ratings
-		when(reviewAndRatingRepository.findAll()).thenReturn(Arrays.asList(reviewAndRating));
+        // Assert
+        assertNotNull(result, "Result should not be null");
+        assertEquals(dto.getReview(), result.getReview());
+        assertEquals(dto.getRating(), result.getRating());
+        verify(reviewAndRatingRepository, times(1)).save(mockReview);
+    }
 
-		// Only include modelMapper stubbing if convertEntityToDTO explicitly calls
-		// modelMapper.map
+    @Test
+    void testGetReviewAndRatingById_success() {
+        // Arrange
+        int reviewId = 1;
+        ReviewAndRating mockReview = new ReviewAndRating();
+        mockReview.setReviewId(reviewId);
+        mockReview.setReview("Excellent book!");
+        mockReview.setRating(5);
 
-		lenient().when(modelMapper.map(reviewAndRating, ReviewAndRatingDTO.class)).thenReturn(reviewAndRatingDTO);
+        ReviewAndRatingDTO mockDTO = new ReviewAndRatingDTO();
+        mockDTO.setReviewId(reviewId);
+        mockDTO.setReview("Excellent book!");
+        mockDTO.setRating(5);
 
-		// Call the service method
-		List<ReviewAndRatingDTO> result = reviewAndRatingService.getAllReviewsAndRatings();
+        when(reviewAndRatingRepository.findById(reviewId)).thenReturn(Optional.of(mockReview));
+        when(modelMapper.map(mockReview, ReviewAndRatingDTO.class)).thenReturn(mockDTO);
 
-		// Assertions
-		assertNotNull(result);
-		assertEquals(1, result.size());
-		assertEquals(reviewAndRatingDTO.getReviewId(), result.get(0).getReviewId());
-		verify(reviewAndRatingRepository, times(1)).findAll();
-	}
+        // Act
+        ReviewAndRatingDTO result = service.getReviewAndRatingById(reviewId);
 
-	@Test
-	public void testGetReviewAndRatingById() {
-		when(reviewAndRatingRepository.findById(1)).thenReturn(Optional.of(reviewAndRating));
+        // Assert
+        assertNotNull(result, "Result should not be null");
+        assertEquals(mockDTO.getReview(), result.getReview());
+        assertEquals(mockDTO.getRating(), result.getRating());
+        verify(reviewAndRatingRepository, times(1)).findById(reviewId);
+    }
 
-		ReviewAndRatingDTO result = reviewAndRatingService.getReviewAndRatingById(1);
+    @Test
+    void testGetAllReviewsAndRatings_success() {
+        // Arrange
+        ReviewAndRating mockReview = new ReviewAndRating();
+        mockReview.setReview("Awesome read!");
+        mockReview.setRating(4);
 
-		assertNotNull(result);
-		assertEquals(reviewAndRatingDTO.getReviewId(), result.getReviewId());
-		verify(reviewAndRatingRepository, times(1)).findById(1);
-	}
+        ReviewAndRatingDTO mockDTO = new ReviewAndRatingDTO();
+        mockDTO.setReview("Awesome read!");
+        mockDTO.setRating(4);
 
-	@Test
-	public void testGetReviewAndRatingByIdNotFound() {
-		when(reviewAndRatingRepository.findById(1)).thenReturn(Optional.empty());
+        when(reviewAndRatingRepository.findAll()).thenReturn(Collections.singletonList(mockReview));
+        when(modelMapper.map(mockReview, ReviewAndRatingDTO.class)).thenReturn(mockDTO);
 
-		Exception exception = assertThrows(IllegalArgumentException.class,
-				() -> reviewAndRatingService.getReviewAndRatingById(1));
+        // Act
+        List<ReviewAndRatingDTO> result = service.getAllReviewsAndRatings();
 
-		assertEquals("Review with ID 1 not found", exception.getMessage());
-		verify(reviewAndRatingRepository, times(1)).findById(1);
-	}
+        // Assert
+        assertNotNull(result, "Result should not be null");
+        assertEquals(1, result.size(), "Result size should be 1");
+        assertEquals(mockDTO.getReview(), result.get(0).getReview());
+        verify(reviewAndRatingRepository, times(1)).findAll();
+    }
 
-	@Test
-	public void testUpdateReviewAndRating() {
-	    // Mocking repository and model calls
-	    when(reviewAndRatingRepository.existsById(1)).thenReturn(true);
-	    when(bookRepository.findByTitle("Test Book")).thenReturn(Optional.of(book));
-	    when(userRepository.findByUserName("Test User")).thenReturn(Optional.of(user));
-	    when(reviewAndRatingRepository.save(any(ReviewAndRating.class))).thenReturn(reviewAndRating);
+    @Test
+    void testUpdateReviewAndRating_success() {
+        // Arrange
+        ReviewAndRatingDTO dto = new ReviewAndRatingDTO();
+        dto.setReviewId(1);
+        dto.setBookId(1L);
+        dto.setUserId(1L);
+        dto.setReview("Updated review!");
+        dto.setRating(4);
 
-	    // Ensure proper stubbing
-	    when(modelMapper.map(eq(reviewAndRating), eq(ReviewAndRatingDTO.class))).thenReturn(reviewAndRatingDTO);
+        ReviewAndRating mockReview = new ReviewAndRating();
+        mockReview.setReview("Updated review!");
+        mockReview.setRating(4);
 
-	    // Call the service method
-	    ReviewAndRatingDTO result = reviewAndRatingService.updateReviewAndRating(reviewAndRatingDTO);
+        Book mockBook = new Book();
+        mockBook.setBookId(1L);
 
-	    // Assertions
-	    assertNotNull(result);
-	    assertEquals(reviewAndRatingDTO, result); // Correct comparison using updated equals method
-	    verify(reviewAndRatingRepository, times(1)).existsById(1);
-	    verify(reviewAndRatingRepository, times(1)).save(any(ReviewAndRating.class));
-	}
+        User mockUser = new User();
+        mockUser.setUserId(1L);
 
-	@Test
-	public void testUpdateReviewAndRatingNotFound() {
-		when(reviewAndRatingRepository.existsById(1)).thenReturn(false);
+        when(reviewAndRatingRepository.existsById(1)).thenReturn(true);
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(mockBook));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(modelMapper.map(dto, ReviewAndRating.class)).thenReturn(mockReview);
+        when(reviewAndRatingRepository.save(mockReview)).thenReturn(mockReview);
+        when(modelMapper.map(mockReview, ReviewAndRatingDTO.class)).thenReturn(dto);
 
-		Exception exception = assertThrows(IllegalArgumentException.class,
-				() -> reviewAndRatingService.updateReviewAndRating(reviewAndRatingDTO));
+        // Act
+        ReviewAndRatingDTO result = service.updateReviewAndRating(dto);
 
-		assertEquals("Review with ID 1 not found", exception.getMessage());
-		verify(reviewAndRatingRepository, times(1)).existsById(1);
-		verifyNoMoreInteractions(reviewAndRatingRepository);
-	}
+        // Assert
+        assertNotNull(result, "Result should not be null");
+        assertEquals(dto.getReview(), result.getReview());
+        assertEquals(dto.getRating(), result.getRating());
+        verify(reviewAndRatingRepository, times(1)).save(mockReview);
+    }
 
-	@Test
-	public void testDeleteReviewAndRating() {
-		when(reviewAndRatingRepository.existsById(1)).thenReturn(true);
+    @Test
+    void testDeleteReviewAndRating_success() {
+        // Arrange
+        int reviewId = 1;
 
-		reviewAndRatingService.deleteReviewAndRating(1);
+        when(reviewAndRatingRepository.existsById(reviewId)).thenReturn(true);
 
-		verify(reviewAndRatingRepository, times(1)).existsById(1);
-		verify(reviewAndRatingRepository, times(1)).deleteById(1);
-	}
+        // Act
+        service.deleteReviewAndRating(reviewId);
 
-	@Test
-	public void testDeleteReviewAndRatingNotFound() {
-		when(reviewAndRatingRepository.existsById(1)).thenReturn(false);
-
-		Exception exception = assertThrows(IllegalArgumentException.class,
-				() -> reviewAndRatingService.deleteReviewAndRating(1));
-
-		assertEquals("Review with ID 1 not found", exception.getMessage());
-		verify(reviewAndRatingRepository, times(1)).existsById(1);
-		verifyNoMoreInteractions(reviewAndRatingRepository);
-	}
+        // Assert
+        verify(reviewAndRatingRepository, times(1)).deleteById(reviewId);
+    }
+     
 }

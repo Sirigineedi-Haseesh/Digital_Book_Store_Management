@@ -5,7 +5,6 @@ import static org.mockito.Mockito.*;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,27 +80,56 @@ public class BookServiceTest {
 
     @Test
     public void testUpdateBooks() {
-        // Mock repository call for fetching the book by title
-        when(bookRepository.findByBookName("Book Title")).thenReturn(book);
-        
-        // Mock repository save call
-        when(bookRepository.save(book)).thenReturn(book);
-        
-        // Use lenient mocking for ModelMapper to handle dynamic arguments
-        lenient().when(modelMapper.map(any(BookDTO.class), eq(Book.class))).thenReturn(book);
-        lenient().when(modelMapper.map(any(Book.class), eq(BookDTO.class))).thenReturn(bookDTO);
-        
-        // Mock inventory repository call
-        when(inventoryRepository.findByBookBookId(1L)).thenReturn(inventory);
+        // Mock existing book entity
+        Book existingBook = new Book();
+        existingBook.setBookId(1L);
+        existingBook.setTitle("A");
+        existingBook.setCategory("Fiction");
+        existingBook.setPrice(500);
+        existingBook.setAuthorName("Old Author");
+        existingBook.setIsbn("1234567890");
+
+        // Mock existing inventory entity
+        Inventory existingInventory = new Inventory();
+        existingInventory.setInventoryId(1L);
+        existingInventory.setStock(50);
+        existingInventory.setBook(existingBook);
+
+        existingBook.setInventory(existingInventory);
+
+        // Mock updated BookDTO
+        BookDTO updatedBookDTO = new BookDTO();
+        updatedBookDTO.setBookId(1L);
+        updatedBookDTO.setTitle("B");
+        updatedBookDTO.setCategory("Sci-Fi");
+        updatedBookDTO.setPrice(700);
+        updatedBookDTO.setAuthorName("New Author");
+        updatedBookDTO.setIsbn("0987654321");
+        updatedBookDTO.setInventory(existingInventory);
+
+        // Mocking repository and mapper behavior
+        lenient().when(bookRepository.findByBookName("A")).thenReturn(existingBook);
+        lenient().when(modelMapper.map(any(BookDTO.class), eq(Book.class))).thenReturn(existingBook);
+        lenient().when(bookRepository.save(existingBook)).thenReturn(existingBook);
+        lenient().when(modelMapper.map(any(Book.class), eq(BookDTO.class))).thenReturn(updatedBookDTO);
 
         // Call the service method
-        BookDTO updatedBook = bookService.updateBooks("Book Title", bookDTO);
+        BookDTO result = bookService.updateBooks("A", updatedBookDTO);
 
         // Assertions
-        assertNotNull(updatedBook);
-        assertEquals(bookDTO, updatedBook);
-    }
+        assertNotNull(result);
+        assertEquals("B", result.getTitle());
+        assertEquals("Sci-Fi", result.getCategory());
+        assertEquals(700, result.getPrice());
+        assertEquals("New Author", result.getAuthorName());
+        assertEquals("0987654321", result.getIsbn());
+        assertNotNull(result.getInventory());
+        assertEquals(existingInventory.getStock(), result.getInventory().getStock());
 
+        // Verify interactions
+        verify(bookRepository, times(1)).findByBookName("A");
+        verify(bookRepository, times(1)).save(existingBook);
+    }
 
     @Test
     public void testUpdateBooksNotFound() {

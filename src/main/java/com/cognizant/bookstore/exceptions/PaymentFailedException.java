@@ -1,9 +1,8 @@
 package com.cognizant.bookstore.exceptions;
 
-public class InsufficientStockException extends RuntimeException {
+public class PaymentFailedException extends RuntimeException {
 	private static final long serialVersionUID = 1L;
-
-    public InsufficientStockException(String message) {
+    public PaymentFailedException(String message) {
         super(message);
     }
 }
