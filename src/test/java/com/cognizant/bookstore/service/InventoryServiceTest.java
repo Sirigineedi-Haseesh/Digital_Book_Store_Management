@@ -3,25 +3,23 @@ package com.cognizant.bookstore.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import java.util.Arrays;
-import java.util.List;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
-
 import com.cognizant.bookstore.dto.InventoryDTO;
+import com.cognizant.bookstore.exceptions.*;
 import com.cognizant.bookstore.model.Book;
 import com.cognizant.bookstore.model.Inventory;
-import com.cognizant.bookstore.repository.InventoryRepository;
 import com.cognizant.bookstore.repository.BookRepository;
+import com.cognizant.bookstore.repository.InventoryRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.modelmapper.ModelMapper;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
-@ExtendWith(MockitoExtension.class)
-public class InventoryServiceTest {
+import java.util.Collections;
+import java.util.List;
+
+class InventoryServiceTest {
 
     @Mock
     private InventoryRepository inventoryRepository;
@@ -36,137 +34,128 @@ public class InventoryServiceTest {
     private InventoryServiceImp inventoryService;
 
     private Inventory inventory;
-    private InventoryDTO inventoryDTO;
     private Book book;
+    private InventoryDTO inventoryDTO;
 
     @BeforeEach
-    public void setUp() {
-        inventory = new Inventory();
-        inventory.setInventoryId(1L);
-        inventory.setStock(150);
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
 
-        inventoryDTO = new InventoryDTO();
-        inventoryDTO.setInventoryId(1L);
-        inventoryDTO.setStock(150);
+        // Set up reusable objects
+        inventory = new Inventory();
+        inventory.setStock(100);
 
         book = new Book();
-        book.setBookId(1L);
-        book.setTitle("Test Book");
+        book.setTitle("Sample Book");
         book.setInventory(inventory);
 
-        inventory.setBook(book);
+        inventoryDTO = new InventoryDTO();
+        inventoryDTO.setStock(100);
     }
 
+    // Test for getInventoryByName
     @Test
-    public void testGetInventoryByName() {
-        when(bookRepository.findByBookName("Test Book")).thenReturn(book);
+    void testGetInventoryByName_Success() {
+        when(bookRepository.findByBookName("Sample Book")).thenReturn(book);
         when(modelMapper.map(inventory, InventoryDTO.class)).thenReturn(inventoryDTO);
 
-        InventoryDTO result = inventoryService.getInventoryByName("Test Book");
+        InventoryDTO result = inventoryService.getInventoryByName("Sample Book");
 
         assertNotNull(result);
-        assertEquals(inventoryDTO, result);
+        assertEquals(100, result.getStock());
+        verify(bookRepository, times(1)).findByBookName("Sample Book");
     }
 
     @Test
-    public void testGetInventoryByNameNotFound() {
-        when(bookRepository.findByBookName("Unknown Book")).thenReturn(null);
+    void testGetInventoryByName_BookNotFound() {
+        when(bookRepository.findByBookName("Nonexistent Book")).thenReturn(null);
 
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            inventoryService.getInventoryByName("Unknown Book");
-        });
+        BookNotFoundException exception = assertThrows(BookNotFoundException.class, 
+            () -> inventoryService.getInventoryByName("Nonexistent Book"));
 
-        assertEquals("Inventory not found for the specified book title: Unknown Book", exception.getMessage());
+        assertEquals("Book not found or inventory not available for the title: Nonexistent Book", exception.getMessage());
+        verify(bookRepository, times(1)).findByBookName("Nonexistent Book");
     }
 
     @Test
-    public void testGetAllInventories() {
-        List<Inventory> inventories = Arrays.asList(inventory);
-        when(inventoryRepository.findAll()).thenReturn(inventories);
+    void testGetInventoryByName_InventoryNotFound() {
+        book.setInventory(null); // No inventory associated with the book
+        when(bookRepository.findByBookName("Sample Book")).thenReturn(book);
+
+        BookNotFoundException exception = assertThrows(BookNotFoundException.class, 
+            () -> inventoryService.getInventoryByName("Sample Book"));
+
+        assertEquals("Book not found or inventory not available for the title: Sample Book", exception.getMessage());
+    }
+
+    // Test for getAllInventories
+    @Test
+    void testGetAllInventories_Success() {
+        when(inventoryRepository.findAll()).thenReturn(List.of(inventory));
         when(modelMapper.map(inventory, InventoryDTO.class)).thenReturn(inventoryDTO);
 
         List<InventoryDTO> result = inventoryService.getAllInventories();
 
         assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals(inventoryDTO, result.get(0));
+        assertEquals(100, result.get(0).getStock());
     }
 
-//    @Test
-//    public void testDeleteInventory() {
-//        when(inventoryRepository.findById(1L)).thenReturn(Optional.of(inventory));
-//        when(modelMapper.map(inventory, InventoryDTO.class)).thenReturn(inventoryDTO);
-//
-//        InventoryDTO result = inventoryService.deleteInventory(1L);
-//
-//        assertNotNull(result);
-//        verify(inventoryRepository, times(1)).delete(inventory);
-//    }
-//
-//    @Test
-//    public void testDeleteInventoryNotFound() {
-//        when(inventoryRepository.findById(1L)).thenReturn(Optional.empty());
-//
-//        Exception exception = assertThrows(RuntimeException.class, () -> {
-//            inventoryService.deleteInventory(1L);
-//        });
-//
-//        assertEquals("Inventory not found for the specified ID: 1", exception.getMessage());
-//    }
-
     @Test
-    public void testReduceStockOnOrder() {
-        when(inventoryRepository.findByBookBookId(1L)).thenReturn(inventory);
+    void testGetAllInventories_NoInventoriesFound() {
+        when(inventoryRepository.findAll()).thenReturn(Collections.emptyList());
 
-        inventoryService.reduceStockOnOrder(1L, 50);
+        NoInventoriesFoundException exception = assertThrows(NoInventoriesFoundException.class, 
+            () -> inventoryService.getAllInventories());
 
-        assertEquals(100, inventory.getStock());
+        assertEquals("No Inventories are Present", exception.getMessage());
+    }
+
+    // Test for reduceStockOnOrder
+    @Test
+    void testReduceStockOnOrder_Success() {
+        when(bookRepository.findByBookName("Sample Book")).thenReturn(book);
+        when(inventoryRepository.findByBookBookId(book.getBookId())).thenReturn(inventory);
+
+        inventoryService.reduceStockOnOrder("Sample Book", 10);
+
+        assertEquals(90, inventory.getStock());
         verify(inventoryRepository, times(1)).save(inventory);
     }
 
     @Test
-    public void testReduceStockOnOrderInsufficientStock() {
-        when(inventoryRepository.findByBookBookId(1L)).thenReturn(inventory);
+    void testReduceStockOnOrder_BookNotFound() {
+        when(bookRepository.findByBookName("Nonexistent Book")).thenReturn(null);
 
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            inventoryService.reduceStockOnOrder(1L, 200);
-        });
+        BookNotFoundException exception = assertThrows(BookNotFoundException.class, 
+            () -> inventoryService.reduceStockOnOrder("Nonexistent Book", 10));
 
-        assertEquals("Insufficient stock available for the book ID: 1", exception.getMessage());
+        assertEquals("Book not found or inventory not available for the title: Nonexistent Book", exception.getMessage());
+        verify(bookRepository, times(1)).findByBookName("Nonexistent Book");
     }
 
     @Test
-    public void testReduceStockOnOrderInventoryNotFound() {
-        when(inventoryRepository.findByBookBookId(1L)).thenReturn(null);
+    void testReduceStockOnOrder_InventoryNotFound() {
+        when(bookRepository.findByBookName("Sample Book")).thenReturn(book);
+        when(inventoryRepository.findByBookBookId(book.getBookId())).thenReturn(null);
 
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            inventoryService.reduceStockOnOrder(1L, 50);
-        });
+        InventoryNotFoundException exception = assertThrows(InventoryNotFoundException.class, 
+            () -> inventoryService.reduceStockOnOrder("Sample Book", 10));
 
-        assertEquals("Inventory not found for the specified book ID: 1", exception.getMessage());
+        assertEquals("Inventory not found for the book: Sample Book", exception.getMessage());
+        verify(inventoryRepository, never()).save(any());
     }
 
-//    @Test
-//    public void testSaveInventory() {
-//        when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
-//        when(modelMapper.map(inventoryDTO, Inventory.class)).thenReturn(inventory);
-//        when(inventoryRepository.save(inventory)).thenReturn(inventory);
-//        when(modelMapper.map(inventory, InventoryDTO.class)).thenReturn(inventoryDTO);
-//
-//        InventoryDTO result = inventoryService.saveInventory(1L, inventoryDTO);
-//
-//        assertNotNull(result);
-//        assertEquals(inventoryDTO, result);
-//    }
+    @Test
+    void testReduceStockOnOrder_InsufficientStock() {
+        inventory.setStock(5); // Set inventory stock below ordered quantity
+        when(bookRepository.findByBookName("Sample Book")).thenReturn(book);
+        when(inventoryRepository.findByBookBookId(book.getBookId())).thenReturn(inventory);
 
-//    @Test
-//    public void testSaveInventoryBookNotFound() {
-//        when(bookRepository.findById(1L)).thenReturn(Optional.empty());
-//
-//        Exception exception = assertThrows(RuntimeException.class, () -> {
-//            inventoryService.saveInventory(1L, inventoryDTO);
-//        });
-//
-//        assertEquals("Book not found for the specified ID: 1", exception.getMessage());
-//    }
+        InsufficientStockException exception = assertThrows(InsufficientStockException.class, 
+            () -> inventoryService.reduceStockOnOrder("Sample Book", 10));
+
+        assertEquals("Insufficient stock available for the book: Sample Book", exception.getMessage());
+        verify(inventoryRepository, never()).save(any());
+    }
 }

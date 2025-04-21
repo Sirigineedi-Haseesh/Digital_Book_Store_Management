@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
-import java.util.Objects;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 
 @Getter
@@ -23,7 +23,7 @@ public class ReviewAndRatingDTO {
     private String review;
 
     @NotNull(message = "Date cannot be null")
-    private Date date;
+    private LocalDateTime date;
 
     @NotBlank(message = "Book title cannot be empty")
     private String bookTitle;

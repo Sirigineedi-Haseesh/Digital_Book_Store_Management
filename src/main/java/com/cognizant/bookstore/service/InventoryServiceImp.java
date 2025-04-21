@@ -1,12 +1,14 @@
 package com.cognizant.bookstore.service;
 
 import com.cognizant.bookstore.dto.InventoryDTO;
-import com.cognizant.bookstore.exceptions.InsufficientStockException;
+import com.cognizant.bookstore.exceptions.*;
 import com.cognizant.bookstore.model.Book;
 import com.cognizant.bookstore.model.Inventory;
 import com.cognizant.bookstore.repository.InventoryRepository;
 import com.cognizant.bookstore.repository.BookRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
+
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class InventoryServiceImp implements InventoryService {
 
     @Autowired
@@ -25,67 +28,59 @@ public class InventoryServiceImp implements InventoryService {
 
     @Autowired
     private BookRepository bookRepository;
-
+ 
     @Override
     public InventoryDTO getInventoryByName(String title) {
         Book book = bookRepository.findByBookName(title);
 
         if (book == null || book.getInventory() == null) {
-            throw new RuntimeException("Inventory not found for the specified book title: " + title);
+        	log.error("Inventory Not Found for Book "+title);
+            throw new BookNotFoundException("Book not found or inventory not available for the title: " + title);
         }
 
-        long id = book.getInventory().getInventoryId();
-        Inventory inventory = inventoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Inventory not found"));
-
+        Inventory inventory = book.getInventory();
         return modelMapper.map(inventory, InventoryDTO.class);
     }
-
-
 
     @Override
     public List<InventoryDTO> getAllInventories() {
         List<Inventory> inventories = inventoryRepository.findAll();
+        if(inventories.isEmpty()) {
+        	throw new NoInventoriesFoundException("No Inventories are Present");
+        }
         return inventories.stream()
                 .map(inventory -> modelMapper.map(inventory, InventoryDTO.class))
                 .collect(Collectors.toList());
     }
 
-
+    
     @Override
     @Transactional
-    public void reduceStockOnOrder(long bookId, int orderedQuantity) {
-        Inventory inventory = inventoryRepository.findByBookBookId(bookId);
-
+    public void reduceStockOnOrder(String bookTitle, int orderedQuantity) {
+        Book book = bookRepository.findByBookName(bookTitle);
+        if (book == null || book.getInventory() == null) {
+        	log.warn("No Book Found with title "+bookTitle);
+            throw new BookNotFoundException("Book not found or inventory not available for the title: " + bookTitle);
+        }
+ 
+        Inventory inventory = inventoryRepository.findByBookBookId(book.getBookId());
         if (inventory == null) {
-            throw new RuntimeException("Inventory not found for the specified book ID: " + bookId);
+        	log.warn("No Inventory Found for Book "+bookTitle);
+            throw new InventoryNotFoundException("Inventory not found for the book: " + bookTitle);
         }
-
-        if (inventory.getStock() <= 0) {
-            throw new InsufficientStockException("Stock is zero or less for the book ID: " + bookId);
-        }
-
+ 
         if (inventory.getStock() < orderedQuantity) {
-            throw new InsufficientStockException("Insufficient stock available for the book ID: " + bookId);
+            throw new InsufficientStockException("Insufficient stock available for the book: " + bookTitle);
         }
-        // Reduce stock
+ 
         inventory.setStock(inventory.getStock() - orderedQuantity);
-
-        // Save updated inventory
-        inventoryRepository.save(inventory);
-
-        // Check stock levels and send notification if stock falls below the threshold
-        int minimumStock = 100; // Define your threshold
-        if (inventory.getStock() <= minimumStock) {
-            notifyBookService(bookId,inventory.getStock());
+ 
+        // Check and notify low stock
+        if (inventory.getStock() <=50) {
+        	log.warn("Low stock alert for book '{}'. Current stock: {}", bookTitle, inventory.getStock());
         }
+ 
+        inventoryRepository.save(inventory);
+        log.info("Stock Reduced Suceessfully");
     }
-
-    private void notifyBookService(Long bookId, int remainingStock) {
-        // Notify about low stock directly within the service
-        System.out.println("Stock is low for Book ID: " + bookId + ". Remaining stock: " + remainingStock);
-
-        // Add any custom logic for immediate handling of low stock if needed
-    }
-
 }

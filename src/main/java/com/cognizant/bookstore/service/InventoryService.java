@@ -7,13 +7,6 @@ import java.util.List;
 public interface InventoryService {
 
     InventoryDTO getInventoryByName(String title);
-
-//    InventoryDTO deleteInventory(Long id);
-
     List<InventoryDTO> getAllInventories();
-
-    void reduceStockOnOrder(long bookId, int orderedQuantity);
-
-//    InventoryDTO saveInventory(long bookId, InventoryDTO inventoryDTO);
-
+	void reduceStockOnOrder(String bookTitle, int orderedQuantity);
 }

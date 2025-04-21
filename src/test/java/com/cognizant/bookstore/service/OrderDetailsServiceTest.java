@@ -1,10 +1,18 @@
 package com.cognizant.bookstore.service;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.modelmapper.ModelMapper;
 
 import com.cognizant.bookstore.dto.OrderBookAssociationDTO;
 import com.cognizant.bookstore.dto.OrderDetailsDTO;
+import com.cognizant.bookstore.exceptions.NoOrderDetailsFoundException;
 import com.cognizant.bookstore.model.Book;
 import com.cognizant.bookstore.model.OrderDetails;
 import com.cognizant.bookstore.model.User;
@@ -12,22 +20,13 @@ import com.cognizant.bookstore.repository.BookRepository;
 import com.cognizant.bookstore.repository.OrderRepository;
 import com.cognizant.bookstore.repository.UserRepository;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
-import java.time.LocalDateTime;
-import java.util.*;
-
-@ExtendWith(MockitoExtension.class)
-public class OrderDetailsServiceTest {
-
-    @Mock
-    private OrderRepository orderRepository;
+class OrderDetailsServiceTest {
 
     @Mock
     private UserRepository userRepository;
@@ -36,142 +35,193 @@ public class OrderDetailsServiceTest {
     private BookRepository bookRepository;
 
     @Mock
-    private ModelMapper modelMapper;
+    private OrderRepository orderRepository;
 
     @Mock
     private InventoryService inventoryService;
 
+    @Mock
+    private ModelMapper modelMapper;
+
     @InjectMocks
     private OrderDetailsService orderDetailsService;
 
-    private OrderDetails orderDetails;
-    private OrderDetailsDTO orderDetailsDTO;
-    private User user;
-    private Book book;
-    private OrderBookAssociationDTO orderBookDTO;
-
     @BeforeEach
-    public void setUp() {
-        // Mock User
-        user = new User();
-        user.setUserId(1L);
-        user.setUserName("Test User");
+    void setup() {
+        MockitoAnnotations.openMocks(this);
+    }
 
-        // Mock Book
-        book = new Book();
-        book.setBookId(1L);
-        book.setAuthorName("Test Book");
-        book.setPrice(100);
+    @Test
+    void testCreateOrder_success() {
+        // Arrange
+        User mockUser = new User();
+        mockUser.setUserId(1L);
 
-        // Mock OrderBookAssociationDTO
-        orderBookDTO = new OrderBookAssociationDTO();
+        Book mockBook = new Book();
+        mockBook.setBookId(1L);
+        mockBook.setTitle("TestBook");
+        mockBook.setPrice(100L);
+
+        OrderBookAssociationDTO orderBookDTO = new OrderBookAssociationDTO();
         orderBookDTO.setBookId(1L);
         orderBookDTO.setQuantity(2);
 
-        // Mock OrderDetailsDTO
-        orderDetailsDTO = new OrderDetailsDTO();
-        orderDetailsDTO.setUserId(1L);
-        orderDetailsDTO.setOrderBooks(new HashSet<>(Collections.singletonList(orderBookDTO)));
+        OrderDetailsDTO inputOrderDetailsDTO = new OrderDetailsDTO();
+        inputOrderDetailsDTO.setUserId(1L);
+        inputOrderDetailsDTO.setOrderBooks(Set.of(orderBookDTO));
 
-        // Mock OrderDetails
-        orderDetails = new OrderDetails();
-        orderDetails.setOrderId(1L);
-        orderDetails.setUser(user);
-        orderDetails.setOrderDate(LocalDateTime.now());
-        orderDetails.setTotalAmount(200.0);
-        orderDetails.setOrderBooks(new HashSet<>());
+        OrderDetails mockSavedOrder = new OrderDetails();
+        mockSavedOrder.setOrderId(1L);
+        mockSavedOrder.setUser(mockUser);
+        mockSavedOrder.setOrderDate(LocalDate.now());
+        mockSavedOrder.setTotalAmount(200.0);
+
+        OrderDetailsDTO outputOrderDetailsDTO = new OrderDetailsDTO();
+        outputOrderDetailsDTO.setOrderId(1L);
+        outputOrderDetailsDTO.setUserId(1L);
+        outputOrderDetailsDTO.setTotalAmount(200.0);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(mockBook));
+        when(orderRepository.save(any(OrderDetails.class))).thenReturn(mockSavedOrder);
+        when(modelMapper.map(mockSavedOrder, OrderDetailsDTO.class)).thenReturn(outputOrderDetailsDTO);
+
+        // Act
+        OrderDetailsDTO result = orderDetailsService.createOrder(inputOrderDetailsDTO);
+
+        // Assert
+        assertNotNull(result, "Result should not be null");
+        assertEquals(1L, result.getUserId(), "User ID should match");
+        assertEquals(200.0, result.getTotalAmount(), "Total amount should match");
+        assertEquals(1L, result.getOrderId(), "Order ID should match");
     }
 
     @Test
-    public void testGetOrderDetails() {
-        when(orderRepository.findAll()).thenReturn(Collections.singletonList(orderDetails));
-        when(modelMapper.map(orderDetails, OrderDetailsDTO.class)).thenReturn(orderDetailsDTO);
-
-        List<OrderDetailsDTO> result = orderDetailsService.getOrderDetails();
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals(orderDetailsDTO, result.get(0));
-        verify(orderRepository, times(1)).findAll();
-    }
-
-    @Test
-    public void testCreateOrder() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
-        doNothing().when(inventoryService).reduceStockOnOrder(1L, 2); // Mock inventory reduction
-
-        when(orderRepository.save(any(OrderDetails.class))).thenReturn(orderDetails);
-        when(modelMapper.map(orderDetails, OrderDetailsDTO.class)).thenReturn(orderDetailsDTO);
-
-        OrderDetailsDTO result = orderDetailsService.createOrder(orderDetailsDTO);
-
-        assertNotNull(result);
-        assertEquals(orderDetailsDTO, result);
-        verify(userRepository, times(1)).findById(1L);
-        verify(bookRepository, times(1)).findById(1L);
-        verify(inventoryService, times(1)).reduceStockOnOrder(1L, 2);
-        verify(orderRepository, times(1)).save(any(OrderDetails.class));
-    }
-
-    @Test
-    public void testCreateOrderUserNotFound() {
+    void testCreateOrder_userNotFound() {
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderDetailsService.createOrder(orderDetailsDTO);
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> orderDetailsService.createOrder(new OrderDetailsDTO()));
 
         assertEquals("User not found", exception.getMessage());
-        verify(userRepository, times(1)).findById(1L);
-        verifyNoInteractions(bookRepository);
-        verifyNoInteractions(inventoryService);
-        verifyNoInteractions(orderRepository);
     }
 
     @Test
-    public void testCreateOrderBookNotFound() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+    void testCreateOrder_bookNotFound() {
+        User mockUser = new User();
+        mockUser.setUserId(1L);
+
+        OrderBookAssociationDTO orderBookDTO = new OrderBookAssociationDTO();
+        orderBookDTO.setBookId(1L);
+        orderBookDTO.setQuantity(2);
+
+        OrderDetailsDTO inputOrderDetailsDTO = new OrderDetailsDTO();
+        inputOrderDetailsDTO.setUserId(1L);
+        inputOrderDetailsDTO.setOrderBooks(Set.of(orderBookDTO));
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
         when(bookRepository.findById(1L)).thenReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderDetailsService.createOrder(orderDetailsDTO);
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> orderDetailsService.createOrder(inputOrderDetailsDTO));
 
         assertEquals("Book not found", exception.getMessage());
-        verify(userRepository, times(1)).findById(1L);
-        verify(bookRepository, times(1)).findById(1L);
-        verifyNoInteractions(inventoryService);
-        verifyNoInteractions(orderRepository);
     }
-//
-//    @Test
-//    public void testCreateOrderInvalidQuantity() {
-//        orderBookDTO.setQuantity(0); // Invalid quantity
-//
-//        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-//            orderDetailsService.createOrder(orderDetailsDTO);
-//        });
-//
-//        assertEquals("Invalid quantity provided.", exception.getMessage());
-//        verifyNoInteractions(userRepository);
-//        verifyNoInteractions(bookRepository);
-//        verifyNoInteractions(inventoryService);
-//        verifyNoInteractions(orderRepository);
-//    }
 
-//    @Test
-//    public void testCreateOrderEmptyOrderBooks() {
-//        orderDetailsDTO.setOrderBooks(new HashSet<>());
-//
-//        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-//            orderDetailsService.createOrder(orderDetailsDTO);
-//        });
-//
-//        assertEquals("Order must contain at least one book", exception.getMessage());
-//        verifyNoInteractions(userRepository);
-//        verifyNoInteractions(bookRepository);
-//        verifyNoInteractions(inventoryService);
-//        verifyNoInteractions(orderRepository);
-//    }
+    @Test
+    void testCreateOrder_invalidQuantity() {
+        User mockUser = new User();
+        mockUser.setUserId(1L);
+
+        Book mockBook = new Book();
+        mockBook.setBookId(1L);
+
+        OrderBookAssociationDTO orderBookDTO = new OrderBookAssociationDTO();
+        orderBookDTO.setBookId(1L);
+        orderBookDTO.setQuantity(0);
+
+        OrderDetailsDTO mockOrderDTO = new OrderDetailsDTO();
+        mockOrderDTO.setUserId(1L);
+        mockOrderDTO.setOrderBooks(Set.of(orderBookDTO));
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(mockUser));
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(mockBook));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+            () -> orderDetailsService.createOrder(mockOrderDTO));
+
+        assertEquals("Invalid quantity provided.", exception.getMessage());
+    }
+
+    @Test
+    void testGetOrderDetailsByDate_Success() {
+        LocalDate date = LocalDate.now();
+
+        OrderDetails mockOrder = new OrderDetails();
+        mockOrder.setOrderDate(date);
+        mockOrder.setTotalAmount(500.0);
+
+        OrderDetailsDTO mockOrderDTO = new OrderDetailsDTO();
+        mockOrderDTO.setOrderDate(date);
+        mockOrderDTO.setTotalAmount(500.0);
+
+        when(orderRepository.findByOrderDate(date)).thenReturn(List.of(mockOrder));
+        when(modelMapper.map(mockOrder, OrderDetailsDTO.class)).thenReturn(mockOrderDTO);
+
+        List<OrderDetailsDTO> result = orderDetailsService.getOrderDetailsByDate(date);
+
+        assertNotNull(result, "Result should not be null");
+        assertEquals(1, result.size(), "Result size should match");
+        assertEquals(500.0, result.get(0).getTotalAmount(), "Total amount should match");
+        verify(orderRepository, times(1)).findByOrderDate(date);
+    }
+
+    @Test
+    void testGetOrderDetailsByDate_NoOrdersFound() {
+        LocalDate date = LocalDate.now();
+        when(orderRepository.findByOrderDate(date)).thenReturn(Collections.emptyList());
+
+        NoOrderDetailsFoundException exception = assertThrows(NoOrderDetailsFoundException.class,
+            () -> orderDetailsService.getOrderDetailsByDate(date));
+
+        assertEquals("No orders found for the date: " + date, exception.getMessage());
+        verify(orderRepository, times(1)).findByOrderDate(date);
+    }
+
+    @Test
+    void testGetOrderDetailsByDateRange_Success() {
+        LocalDate startDate = LocalDate.now().minusDays(7);
+        LocalDate endDate = LocalDate.now();
+
+        OrderDetails mockOrder = new OrderDetails();
+        mockOrder.setOrderDate(endDate);
+        mockOrder.setTotalAmount(800.0);
+
+        OrderDetailsDTO mockOrderDTO = new OrderDetailsDTO();
+        mockOrderDTO.setOrderDate(endDate);
+        mockOrderDTO.setTotalAmount(800.0);
+
+        when(orderRepository.findByOrderDateBetween(startDate, endDate)).thenReturn(List.of(mockOrder));
+        when(modelMapper.map(mockOrder, OrderDetailsDTO.class)).thenReturn(mockOrderDTO);
+
+        List<OrderDetailsDTO> result = orderDetailsService.getOrderDetailsByDateRange(startDate, endDate);
+
+        assertNotNull(result, "Result should not be null");
+        assertEquals(1, result.size(), "Result size should match");
+        assertEquals(800.0, result.get(0).getTotalAmount(), "Total amount should match");
+        verify(orderRepository, times(1)).findByOrderDateBetween(startDate, endDate);
+    }
+
+    @Test
+    void testGetOrderDetailsByDateRange_NoOrdersFound() {
+        LocalDate startDate = LocalDate.now().minusDays(7);
+        LocalDate endDate = LocalDate.now();
+        when(orderRepository.findByOrderDateBetween(startDate, endDate)).thenReturn(Collections.emptyList());
+
+        NoOrderDetailsFoundException exception = assertThrows(NoOrderDetailsFoundException.class,
+            () -> orderDetailsService.getOrderDetailsByDateRange(startDate, endDate));
+
+        assertEquals("No orders found between the dates: " + startDate + " and " + endDate, exception.getMessage());
+        verify(orderRepository, times(1)).findByOrderDateBetween(startDate, endDate);
+    }
 }

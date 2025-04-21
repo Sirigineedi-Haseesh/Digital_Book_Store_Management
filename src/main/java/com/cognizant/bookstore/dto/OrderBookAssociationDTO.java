@@ -6,14 +6,15 @@ import lombok.Data;
 
 @Data
 public class OrderBookAssociationDTO {
-    private Long id;
+	private Long id;
 
     @NotNull(message = "Order ID cannot be null")
     private Long orderId;
 
     @NotNull(message = "Book ID cannot be null")
     private Long bookId;
-
+    
+    @NotNull(message="Quantity is not mentioned")
     @Min(value = 1, message = "Quantity must be at least 1")
     private int quantity;
 }

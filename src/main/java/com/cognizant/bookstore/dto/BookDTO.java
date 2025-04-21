@@ -1,18 +1,22 @@
 package com.cognizant.bookstore.dto;
-import com.cognizant.bookstore.model.Inventory;
-
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+
+import com.cognizant.bookstore.model.Inventory;
+
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Positive;
 
 @Getter
 @Setter
 public class BookDTO {
-    private long bookId;
-
+	
     @NotBlank(message = "ISBN cannot be empty")
     private String isbn;
 
@@ -26,12 +30,14 @@ public class BookDTO {
     @Positive(message = "Price must be a positive value")
     private long price;
 
-    @NotBlank(message = "Author name cannot be empty")
+    @NotBlank(message = "Author name cannot be empty") 
     private String authorName;
 
     private String images;
-
-    private Inventory inventory;  // No validation needed here
+    
+    @NotNull(message = "Stock must be provided")
+    @Valid
+    private InventoryDTO inventory;  // No validation needed here
 }
 
 

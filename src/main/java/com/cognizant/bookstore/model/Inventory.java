@@ -3,7 +3,7 @@ package com.cognizant.bookstore.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
-import lombok.Data;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -20,7 +20,6 @@ public class Inventory {
 	@OneToOne
 	@JoinColumn(name = "bookId")
 	@JsonIgnore
-//	@ToString.Exclude //Added new
 	private Book book;
 	private int stock;
 }

@@ -1,6 +1,7 @@
 package com.cognizant.bookstore.model;
 
-import java.util.Date;
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -21,7 +22,7 @@ public class ReviewAndRating {
 	@ManyToOne //from book table
 	private Book book;
 	private String review;
-	private Date date;
+	private LocalDateTime date;
 	@ManyToOne
 	private User user; //from user table
 }

@@ -6,7 +6,7 @@ import lombok.Data;
 @Data
 public class UserLoginDTO {
     @NotBlank(message = "Username cannot be empty")
-    private String userName;
+    private String username;
 
     @NotBlank(message = "Password cannot be empty")
     @Size(min = 6, message = "Password must be at least 6 characters long")

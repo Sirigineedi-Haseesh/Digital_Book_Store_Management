@@ -9,9 +9,10 @@ import lombok.Data;
 public class UserRegisterDTO {
     @NotBlank(message = "Username cannot be empty")
     @Size(min = 3, max = 20, message = "Username must be between 3 and 20 characters")
-    private String userName;
+    private String username;
 
-    @NotBlank(message = "Password cannot be empty")
+    @NotBlank(message = "Pas"
+    		+ "sword cannot be empty")
     @Size(min = 6, message = "Password must be at least 6 characters long")
     private String password;
 
@@ -24,4 +25,6 @@ public class UserRegisterDTO {
 
     @NotBlank(message = "Address cannot be empty")
     private String address;
+    
+//    private String role;
 }

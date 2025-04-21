@@ -3,12 +3,10 @@ package com.cognizant.bookstore.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.cognizant.bookstore.dto.UserLoginDTO;
-import com.cognizant.bookstore.dto.UserProfileDTO;
-import com.cognizant.bookstore.dto.UserRegisterDTO;
-import com.cognizant.bookstore.exceptions.UserNotFoundException;
-import com.cognizant.bookstore.model.User;
-import com.cognizant.bookstore.repository.UserRepository;
+import java.util.Optional;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,19 +15,31 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import com.cognizant.bookstore.dto.UserLoginDTO;
+import com.cognizant.bookstore.dto.UserProfileDTO;
+import com.cognizant.bookstore.dto.UserRegisterDTO;
+import com.cognizant.bookstore.exceptions.InvalidCredentialsException;
+import com.cognizant.bookstore.exceptions.UserNotFoundException;
+import com.cognizant.bookstore.model.User;
+import com.cognizant.bookstore.repository.UserRepository;
+import com.cognizant.bookstore.util.JwtUtil;
 
 @ExtendWith(MockitoExtension.class)
-public class UserServiceImplTest {
+class UserServiceImplTest {
 
     @Mock
     private UserRepository userRepository;
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtUtil jwtUtil;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -40,149 +50,209 @@ public class UserServiceImplTest {
     private UserLoginDTO userLoginDTO;
 
     @BeforeEach
-    public void setUp() {
-        // Mock User entity
+    void setup() {
         user = new User();
         user.setUserId(1L);
-        user.setUserName("testuser");
-        user.setPassword("password123");
+        user.setUsername("john_doe");
+        user.setPassword("encoded_password");
+        user.setEmail("john@example.com");
         user.setRole("USER");
 
-        // Mock UserProfileDTO
         userProfileDTO = new UserProfileDTO();
-        userProfileDTO.setUserId(1L);
-        userProfileDTO.setUserName("testuser");
-        userProfileDTO.setRole("USER");
+        userProfileDTO.setUsername("john_doe");
+        userProfileDTO.setEmail("john@example.com");
 
-        // Mock UserRegisterDTO
         userRegisterDTO = new UserRegisterDTO();
-        userRegisterDTO.setUserName("testuser");
+        userRegisterDTO.setUsername("john_doe");
         userRegisterDTO.setPassword("password123");
+        userRegisterDTO.setEmail("john@example.com");
 
-        // Mock UserLoginDTO
         userLoginDTO = new UserLoginDTO();
-        userLoginDTO.setUserName("testuser");
+        userLoginDTO.setUsername("john_doe");
         userLoginDTO.setPassword("password123");
     }
 
+    // Test for registering a user
     @Test
-    public void testRegisterUser() {
+    void testRegisterUser() {
         when(modelMapper.map(userRegisterDTO, User.class)).thenReturn(user);
-        when(userRepository.save(user)).thenReturn(user);
+        when(passwordEncoder.encode(userRegisterDTO.getPassword())).thenReturn("encoded_password");
+        when(userRepository.save(any(User.class))).thenReturn(user);
         when(modelMapper.map(user, UserProfileDTO.class)).thenReturn(userProfileDTO);
 
         UserProfileDTO result = userService.registerUser(userRegisterDTO);
 
         assertNotNull(result);
-        assertEquals(userProfileDTO, result);
-        verify(userRepository, times(1)).save(user);
-        verify(modelMapper, times(1)).map(userRegisterDTO, User.class);
-        verify(modelMapper, times(1)).map(user, UserProfileDTO.class);
+        assertEquals(userProfileDTO.getUsername(), result.getUsername());
+        verify(userRepository, times(1)).save(any(User.class));
     }
 
+    // Test for login with correct credentials
     @Test
-    public void testLoginUserSuccess() {
-        when(userRepository.findByUserName("testuser")).thenReturn(Optional.of(user));
+    void testLoginUserSuccess() {
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(userLoginDTO.getPassword(), user.getPassword())).thenReturn(true);
+        when(jwtUtil.generateToken(user.getUsername(), user.getRole())).thenReturn("jwt_token");
 
-        String result = userService.loginUser(userLoginDTO);
+        String token = userService.loginUser(userLoginDTO);
 
-        assertEquals("Login successful", result);
-        verify(userRepository, times(1)).findByUserName("testuser");
+        assertEquals("jwt_token", token);
+        verify(userRepository, times(1)).findByUsername("john_doe");
     }
 
+    // Test for login with invalid credentials
     @Test
-    public void testLoginUserInvalidCredentials() {
-        when(userRepository.findByUserName("testuser")).thenReturn(Optional.of(user));
+    void testLoginUserInvalidCredentials() {
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(userLoginDTO.getPassword(), user.getPassword())).thenReturn(false);
 
-        userLoginDTO.setPassword("wrongpassword");
-
-        String result = userService.loginUser(userLoginDTO);
-
-        assertEquals("Invalid credentials", result);
-        verify(userRepository, times(1)).findByUserName("testuser");
+        assertThrows(InvalidCredentialsException.class, () -> userService.loginUser(userLoginDTO));
+        verify(userRepository, times(1)).findByUsername("john_doe");
     }
 
+    // Test for fetching user profile by username
     @Test
-    public void testGetUserProfile() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+    void testGetUserProfileByUsername() {
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
         when(modelMapper.map(user, UserProfileDTO.class)).thenReturn(userProfileDTO);
 
-        UserProfileDTO result = userService.getUserProfile(1L);
+        UserProfileDTO result = userService.getUserProfileByUsername("john_doe");
 
         assertNotNull(result);
-        assertEquals(userProfileDTO, result);
-        verify(userRepository, times(1)).findById(1L);
+        assertEquals(userProfileDTO.getUsername(), result.getUsername());
+        verify(userRepository, times(1)).findByUsername("john_doe");
     }
 
+    // Test for fetching user profile by username (UserNotFoundException)
     @Test
-    public void testGetUserProfileNotFound() {
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+    void testGetUserProfileByUsernameNotFound() {
+        when(userRepository.findByUsername("unknown_user")).thenReturn(Optional.empty());
 
-        Exception exception = assertThrows(UserNotFoundException.class, () -> {
-            userService.getUserProfile(1L);
-        });
-
-        assertEquals("User with ID 1 not found", exception.getMessage());
-        verify(userRepository, times(1)).findById(1L);
+        assertThrows(UserNotFoundException.class, () -> userService.getUserProfileByUsername("unknown_user"));
+        verify(userRepository, times(1)).findByUsername("unknown_user");
     }
 
+    // Test for updating user profile
     @Test
-    public void testUpdateUserProfile() {
-        // Mock repository calls
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(user)).thenReturn(user);
-
-        // Adjust ModelMapper stubbing to handle dynamic arguments
-        lenient().when(modelMapper.map(any(UserProfileDTO.class), eq(User.class))).thenReturn(user);
-        lenient().when(modelMapper.map(any(User.class), eq(UserProfileDTO.class))).thenReturn(userProfileDTO);
-
-        // Call the service method
-        UserProfileDTO result = userService.updateUserProfile(1L, userProfileDTO);
-
-        // Assertions
-        assertNotNull(result);
-        assertEquals(userProfileDTO, result);
-        verify(userRepository, times(1)).findById(1L);
-        verify(userRepository, times(1)).save(user);
-        verify(modelMapper, times(1)).map(userProfileDTO, User.class);
-        verify(modelMapper, times(1)).map(user, UserProfileDTO.class);
-    }
-
-
-    @Test
-    public void testGetAllUsers() {
-        when(userRepository.findAll()).thenReturn(Arrays.asList(user));
+    void testUpdateUserProfileByUsername() {
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
         when(modelMapper.map(user, UserProfileDTO.class)).thenReturn(userProfileDTO);
 
-        List<UserProfileDTO> result = userService.getAllUser();
+        UserProfileDTO result = userService.updateUserProfileByUsername("john_doe", userProfileDTO);
 
         assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals(userProfileDTO, result.get(0));
-        verify(userRepository, times(1)).findAll();
+        assertEquals(userProfileDTO.getUsername(), result.getUsername());
+        verify(userRepository, times(1)).save(any(User.class));
     }
 
+    // Test for updating user profile (UserNotFoundException)
     @Test
-    public void testDeleteUser() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+    void testUpdateUserProfileByUsernameNotFound() {
+        when(userRepository.findByUsername("unknown_user")).thenReturn(Optional.empty());
 
-        String result = userService.deleteUser(1L);
+        assertThrows(UserNotFoundException.class, () -> userService.updateUserProfileByUsername("unknown_user", userProfileDTO));
+        verify(userRepository, times(1)).findByUsername("unknown_user");
+    }
 
-        assertEquals("User with username testuser has been deleted successfully.", result);
-        verify(userRepository, times(1)).findById(1L);
+    // Test for deleting user by username
+    @Test
+    void testDeleteUserByUsername() {
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+
+        String result = userService.deleteUserByUsername("john_doe");
+
+        assertEquals("User with username john_doe has been deleted successfully.", result);
         verify(userRepository, times(1)).delete(user);
     }
 
+    // Test for deleting user by username (UserNotFoundException)
     @Test
-    public void testDeleteUserNotFound() {
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+    void testDeleteUserByUsernameNotFound() {
+        when(userRepository.findByUsername("unknown_user")).thenReturn(Optional.empty());
 
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            userService.deleteUser(1L);
-        });
+        assertThrows(UserNotFoundException.class, () -> userService.deleteUserByUsername("unknown_user"));
+        verify(userRepository, times(1)).findByUsername("unknown_user");
+    }
+    @Test
+    void testAssignRoleSuccess() {
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
 
-        assertEquals("User not found", exception.getMessage());
-        verify(userRepository, times(1)).findById(1L);
-        verifyNoMoreInteractions(userRepository);
+        String result = userService.assignRoleByUsername("john_doe", "ADMIN");
+
+        assertEquals("Role ADMIN has been successfully assigned to user john_doe", result);
+        assertEquals("ADMIN", user.getRole());
+        verify(userRepository, times(1)).findByUsername("john_doe");
+        verify(userRepository, times(1)).save(user);
+    }
+
+    // Test for assigning a role to a non-existing user
+    @Test
+    void testAssignRoleUserNotFound() {
+        when(userRepository.findByUsername("unknown_user")).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.assignRoleByUsername("unknown_user", "ADMIN"));
+        verify(userRepository, times(1)).findByUsername("unknown_user");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    // Test for assigning an invalid role
+    @Test
+    void testAssignRoleInvalidRole() {
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+        List<String> validRoles = Arrays.asList("ADMIN", "USER");
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> userService.assignRoleByUsername("john_doe", "INVALID_ROLE"));
+        assertEquals("Invalid role: INVALID_ROLE. Valid roles are " + validRoles, exception.getMessage());
+        verify(userRepository, times(1)).findByUsername("john_doe");
+        verify(userRepository, never()).save(any(User.class));
+    }
+    @Test
+    void testChangePasswordSuccess() {
+        // Mock the user repository to return the user
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+        // Mock the password encoder to match the old password
+        when(passwordEncoder.matches("old_password", "encoded_password")).thenReturn(true);
+        // Mock the password encoding for the new password
+        when(passwordEncoder.encode("new_password")).thenReturn("encoded_new_password");
+
+        // Call the service method
+        String result = userService.changePassword("john_doe", "old_password", "new_password");
+
+        // Assert the results
+        assertEquals("Password has been successfully updated for user john_doe", result);
+        assertEquals("encoded_new_password", user.getPassword());
+
+        // Verify the interactions
+        verify(userRepository, times(1)).findByUsername("john_doe");
+        verify(passwordEncoder, times(1)).matches("old_password", "encoded_password");
+        verify(passwordEncoder, times(1)).encode("new_password");
+        verify(userRepository, times(1)).save(user);
+    }
+
+
+    // Test for changing password when user not found
+    @Test
+    void testChangePasswordUserNotFound() {
+        when(userRepository.findByUsername("unknown_user")).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.changePassword("unknown_user", "old_password", "new_password"));
+        verify(userRepository, times(1)).findByUsername("unknown_user");
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    // Test for changing password with incorrect old password
+    @Test
+    void testChangePasswordInvalidOldPassword() {
+        when(userRepository.findByUsername("john_doe")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong_old_password", user.getPassword())).thenReturn(false);
+
+        assertThrows(InvalidCredentialsException.class, () -> userService.changePassword("john_doe", "wrong_old_password", "new_password"));
+        verify(userRepository, times(1)).findByUsername("john_doe");
+        verify(passwordEncoder, times(1)).matches("wrong_old_password", user.getPassword());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
     }
 }
