@@ -2,6 +2,8 @@ package com.cognizant.bookstore.model;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -24,5 +26,6 @@ public class ReviewAndRating {
 	private String review;
 	private LocalDateTime date;
 	@ManyToOne
+	@JsonIgnore
 	private User user; //from user table
 }

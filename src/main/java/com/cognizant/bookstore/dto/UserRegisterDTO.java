@@ -26,5 +26,5 @@ public class UserRegisterDTO {
     @NotBlank(message = "Address cannot be empty")
     private String address;
     
-//    private String role;
+    private String role;
 }

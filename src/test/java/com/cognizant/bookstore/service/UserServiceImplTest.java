@@ -21,6 +21,7 @@ import com.cognizant.bookstore.dto.UserLoginDTO;
 import com.cognizant.bookstore.dto.UserProfileDTO;
 import com.cognizant.bookstore.dto.UserRegisterDTO;
 import com.cognizant.bookstore.exceptions.InvalidCredentialsException;
+import com.cognizant.bookstore.exceptions.UserAlreadyExistException;
 import com.cognizant.bookstore.exceptions.UserNotFoundException;
 import com.cognizant.bookstore.model.User;
 import com.cognizant.bookstore.repository.UserRepository;
@@ -40,6 +41,9 @@ class UserServiceImplTest {
 
     @Mock
     private JwtUtil jwtUtil;
+   
+    @InjectMocks
+    private AuthenticationService authService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -73,18 +77,50 @@ class UserServiceImplTest {
     }
 
     // Test for registering a user
+//    @Test
+//    void testRegisterUser() {
+//        when(modelMapper.map(userRegisterDTO, User.class)).thenReturn(user);
+//        when(passwordEncoder.encode(userRegisterDTO.getPassword())).thenReturn("encoded_password");
+//        when(userRepository.save(any(User.class))).thenReturn(user);
+//        when(modelMapper.map(user, UserProfileDTO.class)).thenReturn(userProfileDTO);
+//
+//        UserProfileDTO result = userService.registerUser(userRegisterDTO);
+//
+//        assertNotNull(result);
+//        assertEquals(userProfileDTO.getUsername(), result.getUsername());
+//        verify(userRepository, times(1)).save(any(User.class));
+//    }
     @Test
-    void testRegisterUser() {
-        when(modelMapper.map(userRegisterDTO, User.class)).thenReturn(user);
-        when(passwordEncoder.encode(userRegisterDTO.getPassword())).thenReturn("encoded_password");
-        when(userRepository.save(any(User.class))).thenReturn(user);
-        when(modelMapper.map(user, UserProfileDTO.class)).thenReturn(userProfileDTO);
+    void testRegisterUser_Success() throws UserAlreadyExistException {
+        // Mock the behavior for a successful registration
+        when(userRepository.findByUsername(userRegisterDTO.getUsername())).thenReturn(Optional.empty()); // No existing user
+        when(modelMapper.map(userRegisterDTO, User.class)).thenReturn(user); // Mock DTO to entity mapping
+        when(passwordEncoder.encode(userRegisterDTO.getPassword())).thenReturn("encoded_password"); // Match the actual argument
+        when(userRepository.save(any(User.class))).thenReturn(user); // Mock saving user
 
-        UserProfileDTO result = userService.registerUser(userRegisterDTO);
+        // Perform the operation
+        User result = authService.register(userRegisterDTO);
 
-        assertNotNull(result);
-        assertEquals(userProfileDTO.getUsername(), result.getUsername());
-        verify(userRepository, times(1)).save(any(User.class));
+        // Assertions
+        assertNotNull(result); // Ensure result is not null
+        assertEquals(user.getUsername(), result.getUsername()); // Verify returned username
+        verify(userRepository, times(1)).save(any(User.class)); // Ensure save was called
+    }
+
+    @Test
+    void testRegisterUser_DuplicateUsername() {
+        // Mock the behavior for a duplicate username
+        when(userRepository.findByUsername(userRegisterDTO.getUsername())).thenReturn(Optional.of(user)); // Existing user
+
+        // Perform the operation and expect an exception
+        UserAlreadyExistException thrownException = assertThrows(
+            UserAlreadyExistException.class,
+            () -> authService.register(userRegisterDTO)
+        );
+
+        // Assertions
+        assertEquals("A user with the same username already exists", thrownException.getMessage()); // Verify exception message
+        verify(userRepository, never()).save(any(User.class)); // Ensure save was never called
     }
 
     // Test for login with correct credentials

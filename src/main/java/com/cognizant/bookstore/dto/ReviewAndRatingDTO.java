@@ -22,14 +22,10 @@ public class ReviewAndRatingDTO {
     @NotBlank(message = "Review cannot be empty")
     private String review;
 
-    @NotNull(message = "Date cannot be null")
     private LocalDateTime date;
 
     @NotBlank(message = "Book title cannot be empty")
     private String bookTitle;
-
-    @NotBlank(message = "Username cannot be empty")
-    private String userName;
 
     @NotNull(message = "Book ID cannot be null")
     private Long bookId;

@@ -13,9 +13,10 @@ import com.cognizant.bookstore.dto.OrderDetailsDTO;
 import com.cognizant.bookstore.exceptions.*;
 import com.cognizant.bookstore.service.OrderDetailsService;
 
-import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
+@Slf4j
 public class OrderController {
 	
     @Autowired
@@ -24,52 +25,40 @@ public class OrderController {
     @GetMapping("/admin/date/{date}")
     public ResponseEntity<?> getOrderDetailsByDate(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        log.info("Received request to fetch order details for date: {}", date);
+
         try {
-            // Call the service method to fetch orders by date
             List<OrderDetailsDTO> orderDetails = orderDetailsService.getOrderDetailsByDate(date);
-            // Return HTTP 200 if orders are found
+            log.info("Successfully fetched {} order(s) for date: {}", orderDetails.size(), date);
             return ResponseEntity.ok(orderDetails);
-        } catch (InvalidOrderException e) {
-            // Handle custom exception for no orders
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        } catch (UserNotFoundException e) {
-            // Handle custom exception for no orders
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         } catch (NoOrderDetailsFoundException e) {
-            // Handle custom exception for no orders
+            log.warn("No orders found for date: {}", date, e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
-        catch (Exception e) {
-            // Handle any unexpected exceptions
+        } catch (Exception e) {
+            log.error("Unexpected error occurred while fetching orders for date: {}", date, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(null);
+                    .body("An unexpected error occurred: " + e.getMessage());
         }
-        
-        //2025-05-21
     }
 
-
-    @GetMapping("admin/dateRange")
+    @GetMapping("/admin/dateRange")
     public ResponseEntity<?> getOrderDetailsByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        log.info("Received request to fetch order details between dates: {} and {}", startDate, endDate);
+
         try {
-            // Call service method to fetch orders within the date range
             List<OrderDetailsDTO> orderDetails = orderDetailsService.getOrderDetailsByDateRange(startDate, endDate);
-
-            // Return HTTP 200 with the fetched data
+            log.info("Successfully fetched {} order(s) between dates: {} and {}", orderDetails.size(), startDate, endDate);
             return ResponseEntity.ok(orderDetails);
-
-        } catch (IllegalArgumentException e) {
-            // Handle invalid date ranges
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-
         } catch (NoOrderDetailsFoundException e) {
-            // Handle case where no orders are found
+            log.warn("No orders found between dates: {} and {}", startDate, endDate, e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid date range provided: {} to {}", startDate, endDate, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (Exception e) {
-            // Handle unexpected exceptions
+            log.error("Unexpected error occurred while fetching orders between dates: {} and {}", startDate, endDate, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("An unexpected error occurred: " + e.getMessage());
         }
@@ -77,28 +66,27 @@ public class OrderController {
     
     @PostMapping("/create")
     public ResponseEntity<?> createOrder(@RequestBody OrderDetailsDTO orderDetailsDTO) {
+        log.info("Received request to create an order for user ID: {}", orderDetailsDTO.getUserId());
+
         try {
-            // Attempt to create the order
             OrderDetailsDTO savedOrder = orderDetailsService.createOrder(orderDetailsDTO);
-            // Return the created order with HTTP status 201 (Created)
+            log.info("Order created successfully for user ID: {} with total amount: {}", 
+                    orderDetailsDTO.getUserId(), savedOrder.getTotalAmount());
             return ResponseEntity.status(HttpStatus.CREATED).body(savedOrder);
-
-        } catch (UserNotFoundException ex) {
-            // Handle case where the user is not found
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage()+"inside");
-
-        } catch (BooksNotFoundException ex) {
-            // Handle case where a book in the order is not found
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
-
-        } catch (InvalidOrderException ex) {
-            // Handle case where the order details are invalid
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
-
-        } catch (Exception ex) {
-            // Handle any unexpected errors
+        } catch (UserNotFoundException e) {
+            log.warn("User not found for order creation. User ID: {}", orderDetailsDTO.getUserId(), e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (BooksNotFoundException e) {
+            log.warn("A book in the order was not found. User ID: {}", orderDetailsDTO.getUserId(), e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (InvalidOrderException e) {
+            log.warn("Invalid order details provided for user ID: {}", orderDetailsDTO.getUserId(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            log.error("Unexpected error occurred while creating an order for user ID: {}", 
+                    orderDetailsDTO.getUserId(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("An unexpected error occurred: " + ex.getMessage());
+                    .body("An unexpected error occurred: " + e.getMessage());
         }
     }
     
@@ -106,27 +94,22 @@ public class OrderController {
     public ResponseEntity<?> changeStatus(
             @PathVariable Long id,
             @PathVariable String status) {
+        log.info("Received request to change status of order ID: {} to {}", id, status);
+
         try {
-            // Call service method to change the status
             String result = orderDetailsService.changeOrderStatus(id, status);
-
-            // Return HTTP 200 with the result
+            log.info("Successfully changed status of order ID: {} to {}", id, status);
             return ResponseEntity.ok(result);
-
         } catch (OrderNotFoundException e) {
-            // Handle case where the order is not found
+            log.warn("Order not found with ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-
         } catch (IllegalArgumentException e) {
-            // Handle invalid status
+            log.warn("Invalid status provided for order ID: {}. Status: {}", id, status, e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-
         } catch (Exception e) {
-            // Handle unexpected exceptions
+            log.error("Unexpected error occurred while changing status of order ID: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("An unexpected error occurred: " + e.getMessage());
         }
     }
-
-    
 }

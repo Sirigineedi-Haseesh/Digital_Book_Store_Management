@@ -9,7 +9,6 @@ import com.cognizant.bookstore.dto.UserProfileDTO;
 import com.cognizant.bookstore.dto.UserRegisterDTO;
  
 public interface UserService {
-    UserProfileDTO registerUser(UserRegisterDTO dto);
     String loginUser(UserLoginDTO dto);
     UserProfileDTO getUserProfileByUsername(String username); // ✅ Changed userId to username
     UserProfileDTO updateUserProfileByUsername(String username, UserProfileDTO dto); // ✅ Changed userId to username

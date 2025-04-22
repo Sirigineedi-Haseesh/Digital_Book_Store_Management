@@ -31,5 +31,5 @@ public class OrderDetails {
     private Set<OrderBookAssociation> orderBooks = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
-    private OrderStatus status;
+    private OrderStatus status = OrderStatus.PENDING;
 }

@@ -10,6 +10,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import com.cognizant.bookstore.dto.ReviewAndRatingDTO;
+import com.cognizant.bookstore.exceptions.BookNotFoundException;
+import com.cognizant.bookstore.exceptions.ReviewNotFoundException;
 import com.cognizant.bookstore.model.Book;
 import com.cognizant.bookstore.model.ReviewAndRating;
 import com.cognizant.bookstore.model.User;
@@ -26,7 +28,7 @@ import java.util.List;
 class ReviewAndRatingServiceTest {
 
     @InjectMocks
-    private ReviewAndRatingService service;
+    private ReviewAndRatingServiceImpl service;
 
     @Mock
     private ReviewAndRatingRepository reviewAndRatingRepository;
@@ -186,4 +188,75 @@ class ReviewAndRatingServiceTest {
         verify(reviewAndRatingRepository, times(1)).deleteById(reviewId);
     }
      
+    
+    // Test findRatingsByTitle with success
+    @Test
+    void testFindRatingsByTitle_Success() {
+        String bookTitle = "Great Book";
+
+        Book book = new Book();
+        book.setTitle(bookTitle);
+        book.setBookId(1L);
+
+        ReviewAndRating review1 = new ReviewAndRating();
+        review1.setRating(5);
+        review1.setReview("Amazing book!");
+
+        ReviewAndRating review2 = new ReviewAndRating();
+        review2.setRating(4);
+        review2.setReview("Pretty good!");
+
+        when(bookRepository.findByBookName(bookTitle)).thenReturn(book);
+        when(reviewAndRatingRepository.findByBookBookId(book.getBookId())).thenReturn(List.of(review1, review2));
+
+        List<ReviewAndRating> result = service.getReviewsByBookTitle(bookTitle);
+
+        assertEquals(2, result.size());
+        assertEquals(5, result.get(0).getRating());
+        assertEquals("Amazing book!", result.get(0).getReview());
+        assertEquals(4, result.get(1).getRating());
+        assertEquals("Pretty good!", result.get(1).getReview());
+
+        verify(bookRepository).findByBookName(bookTitle);
+        verify(reviewAndRatingRepository).findByBookBookId(book.getBookId());
+    }
+
+    // Test findRatingsByTitle with book not found
+    @Test
+    void testFindRatingsByTitle_BookNotFound() {
+        String bookTitle = "Nonexistent Book";
+
+        when(bookRepository.findByBookName(bookTitle)).thenReturn(null);
+
+        Exception exception = assertThrows(BookNotFoundException.class, () -> {
+            service.getReviewsByBookTitle(bookTitle);
+        });
+
+        assertEquals("Book with title 'Nonexistent Book' not found", exception.getMessage());
+
+        verify(bookRepository).findByBookName(bookTitle);
+        verify(reviewAndRatingRepository, never()).findByBookBookId(anyLong());
+    }
+
+    // Test findRatingsByTitle with no reviews
+    @Test
+    void testFindRatingsByTitle_NoReviews() {
+        String bookTitle = "Lonely Book";
+
+        Book book = new Book();
+        book.setTitle(bookTitle);
+        book.setBookId(2L);
+
+        when(bookRepository.findByBookName(bookTitle)).thenReturn(book);
+        when(reviewAndRatingRepository.findByBookBookId(book.getBookId())).thenReturn(List.of());
+
+        Exception exception = assertThrows(ReviewNotFoundException.class, () -> {
+            service.getReviewsByBookTitle(bookTitle);
+        });
+
+        assertEquals("No reviews found for book: Lonely Book", exception.getMessage());
+
+        verify(bookRepository).findByBookName(bookTitle);
+        verify(reviewAndRatingRepository).findByBookBookId(book.getBookId());
+    }
 }

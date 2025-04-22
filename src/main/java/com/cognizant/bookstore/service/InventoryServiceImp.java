@@ -34,7 +34,6 @@ public class InventoryServiceImp implements InventoryService {
         Book book = bookRepository.findByBookName(title);
 
         if (book == null || book.getInventory() == null) {
-        	log.error("Inventory Not Found for Book "+title);
             throw new BookNotFoundException("Book not found or inventory not available for the title: " + title);
         }
 
@@ -59,13 +58,11 @@ public class InventoryServiceImp implements InventoryService {
     public void reduceStockOnOrder(String bookTitle, int orderedQuantity) {
         Book book = bookRepository.findByBookName(bookTitle);
         if (book == null || book.getInventory() == null) {
-        	log.warn("No Book Found with title "+bookTitle);
             throw new BookNotFoundException("Book not found or inventory not available for the title: " + bookTitle);
         }
  
         Inventory inventory = inventoryRepository.findByBookBookId(book.getBookId());
         if (inventory == null) {
-        	log.warn("No Inventory Found for Book "+bookTitle);
             throw new InventoryNotFoundException("Inventory not found for the book: " + bookTitle);
         }
  
@@ -81,6 +78,5 @@ public class InventoryServiceImp implements InventoryService {
         }
  
         inventoryRepository.save(inventory);
-        log.info("Stock Reduced Suceessfully");
     }
 }
